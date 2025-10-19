@@ -1,0 +1,20 @@
+using ChannelMicroservice.Application.Channels;
+using ChannelMicroservice.Infrastructure.Channels;
+using ChannelMicroservice.Messaging;
+using ChannelMicroservice.Presentation;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddSingleton<IChannelRepository, InMemoryChannelRepository>();
+builder.Services.AddSingleton<IMessageClient, NoopMessageClient>();
+builder.Services.AddScoped<ChannelService>();
+
+var app = builder.Build();
+
+app.MapGet("/health", () => Results.Ok(new { ok = true }));
+app.MapChannelEndpoints();
+
+app.Run();
+
+// Gør Program synlig for WebApplicationFactory i tests
+public partial class Program { }

@@ -1,0 +1,30 @@
+﻿version: "3.9"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Web UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  channelmicroservice:
+    build:
+      context: ../..            # repo root (two dirs up from this file)
+      dockerfile: apps/channel-microservice/Dockerfile
+    container_name: channelmicroservice
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:80
+      # (later) Messaging__ConnectionString=host=rabbitmq;username=guest;password=guest;publisherConfirms=true
+    ports:
+      - "8000:80"               # host:container

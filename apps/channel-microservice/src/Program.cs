@@ -15,3 +15,6 @@ app.MapGet("/health", () => Results.Ok(new { ok = true }));
 app.MapChannelEndpoints();
 
 app.Run();
+
+// Gør Program synlig for WebApplicationFactory i tests
+public partial class Program { }

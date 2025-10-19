@@ -128,3 +128,18 @@ Integration tests
 
 Tester REST-endpoint /channels
 Verificerer 201-response og publicering af event (mocked message client)
+
+## Feature Progress: Channel Creation 
+
+This week, the **Channel Creation feature** was initiated.
+
+**Implemented so far:**
+- A working REST API endpoint `POST /channels` that creates new channels.
+- Input validation ensuring the channel name is required, trimmed, and unique.
+- Domain event `ChannelCreated` is defined and raised within the service.
+- Event publishing is currently mocked for testing (RabbitMQ integration planned).
+
+**Next steps:**
+- Persist channels in a real database.
+- Integrate RabbitMQ for actual event publishing.
+- Add GET, PUT, and DELETE endpoints to complete CRUD functionality.

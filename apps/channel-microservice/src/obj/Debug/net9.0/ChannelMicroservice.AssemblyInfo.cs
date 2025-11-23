@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ChannelMicroservice")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+88aa1bf93e1945dca9b17e3ec0ff46e663d85a10")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+efb95e22c70af4de2542520cdb1a531bb87578cb")]
 [assembly: System.Reflection.AssemblyProductAttribute("ChannelMicroservice")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ChannelMicroservice")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

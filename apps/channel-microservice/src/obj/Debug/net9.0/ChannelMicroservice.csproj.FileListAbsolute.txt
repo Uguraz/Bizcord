@@ -32,3 +32,5 @@ C:\Users\lasse\OneDrive\Dokumenter\GitHub\Bizcord\apps\channel-microservice\src\
 C:\Users\lasse\OneDrive\Dokumenter\GitHub\Bizcord\apps\channel-microservice\src\obj\Debug\net9.0\ChannelMicroservice.pdb
 C:\Users\lasse\OneDrive\Dokumenter\GitHub\Bizcord\apps\channel-microservice\src\obj\Debug\net9.0\ChannelMicroservice.genruntimeconfig.cache
 C:\Users\lasse\OneDrive\Dokumenter\GitHub\Bizcord\apps\channel-microservice\src\obj\Debug\net9.0\ref\ChannelMicroservice.dll
+C:\Users\lasse\OneDrive\Dokumenter\GitHub\Bizcord\apps\channel-microservice\src\bin\Debug\net9.0\Polly.dll
+C:\Users\lasse\OneDrive\Dokumenter\GitHub\Bizcord\apps\channel-microservice\src\bin\Debug\net9.0\Polly.Core.dll

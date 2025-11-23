@@ -197,3 +197,90 @@ Invoke-RestMethod -Method Post `
 
 
 Resultat: 201 Created + ny channel
+
+##  Reliability (W48)
+
+Denne uge blev der arbejdet med reliability patterns for Channel-microservicen. Fokus var på at identificere svage punkter og implementere en konkret strategi til at øge robustheden i servicen.
+
+Potentielle Failure Points
+
+Nedenfor er de primære steder, microservicen kan fejle — og hvordan problemer håndteres.
+
+1. HTTP-kald fra API Gateway → Channel Microservice
+
+Failure: Microservicen kan være nede, langsom eller midlertidigt utilgængelig.
+Konsekvens: Brugeren oplever at forespørgslen fejler eller loader for længe.
+Mitigation:
+
+Vi har implementeret Retry policy, som automatisk forsøger requestet igen ved midlertidige fejl.
+
+Brug af circuit breaker er planlagt (ikke implementeret endnu).
+
+2. ChannelService → Repository (in-memory / senere database)
+
+Failure: Repository kan fejle ved duplicate checks eller ved læsning af data.
+Konsekvens: 409 conflicts eller brud i flow.
+Mitigation:
+
+Validationslogik og exception-håndtering sikrer, at applikationen ikke crasher.
+
+Graciøs håndtering af både ArgumentException og InvalidOperationException.
+
+3. Event Publishing (RabbitMQ senere)
+
+Failure: Messaging-system kan være nede eller utilgængeligt.
+Konsekvens: ChannelCreated-events tabes.
+Mitigation:
+
+Event publishing er pt. mock’et.
+
+Når RabbitMQ integreres tilføjes:
+
+Retry
+
+Dead-letter queue
+
+Durable exchange/queue opsætning
+
+Implementeret Reliability Policy
+Retry Policy for ChannelService
+
+Der er implementeret en Polly-retry strategi som beskytter mod midlertidige fejl i repository- eller event-publishing-laget.
+
+Retry forsøger operationen igen 3 gange med eksponentiel backoff.
+
+Eksempel fra Program.cs:
+
+var retryPolicy = Policy
+    .Handle<Exception>()
+    .WaitAndRetryAsync(
+        retryCount: 3,
+        sleepDurationProvider: attempt => TimeSpan.FromMilliseconds(200 * attempt),
+        onRetry: (ex, delay, attempt, ctx) =>
+        {
+            builder.Logger.LogWarning(
+                ex,
+                "Retrying operation (attempt {Attempt}) after {Delay}ms",
+                attempt,
+                delay.TotalMilliseconds);
+        });
+
+
+Policy’en bruges ved endpoint-kald:
+
+app.MapPost("/channels", async (CreateChannelRequest req, ChannelService svc, CancellationToken ct) =>
+{
+    return await retryPolicy.ExecuteAsync(async () =>
+    {
+        var dto = await svc.CreateAsync(req, ct);
+        return Results.Created($"/channels/{dto.Id}", dto);
+    });
+});
+
+Resultat
+
+Microservicen er nu mere robust, især mod midlertidige repository-fejl.
+
+Brugeren får færre fejlbeskeder og bedre stabilitet.
+
+Logging gør det synligt, når retry mekanismen aktiveres.

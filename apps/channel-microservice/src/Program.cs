@@ -1,12 +1,28 @@
+using ChannelMicroservice.Application.Channels;
+using ChannelMicroservice.Infrastructure.Channels;
+using ChannelMicroservice.Messaging;
+using ChannelMicroservice.Presentation;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// -------------------------------------------------------
+// Dependency Injection
+// -------------------------------------------------------
+builder.Services.AddSingleton<IChannelRepository, InMemoryChannelRepository>();
+builder.Services.AddSingleton<IMessageClient, NoopMessageClient>();
+builder.Services.AddScoped<ChannelService>();
+
 var app = builder.Build();
 
+// -------------------------------------------------------
 // Simple API key auth for POST /channels
+// -------------------------------------------------------
 const string ApiKeyHeaderName = "X-Api-Key";
 const string ApiKeyValue = "super-secret-key";
 
 app.Use(async (context, next) =>
 {
-    // Vi beskytter kun POST /channels
+    // Beskyt kun POST /channels
     if (context.Request.Path.StartsWithSegments("/channels") &&
         HttpMethods.IsPost(context.Request.Method))
     {
@@ -22,10 +38,14 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// dine existing endpoints:
+// -------------------------------------------------------
+// Endpoints
+// -------------------------------------------------------
+
+// Health check
 app.MapGet("/health", () => Results.Ok(new { ok = true }));
 
-// her mapper du dine channel-endpoints
-// fx ChannelEndpoints.MapChannels(app);
+// Channel endpoints (fra ChannelEndpoints.cs)
+app.MapChannelEndpoints();
 
 app.Run();

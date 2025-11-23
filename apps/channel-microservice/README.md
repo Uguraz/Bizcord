@@ -128,3 +128,72 @@ Integration tests
 
 Tester REST-endpoint /channels
 Verificerer 201-response og publicering af event (mocked message client)
+
+W12 – API Gateway & Authorization
+API Gateway Routing
+
+I uge 12 blev API Gateway-delen for Bizcord opsat ved hjælp af YARP (Yet Another Reverse Proxy).
+Gatewayen fungerer som indgangen til systemet og videresender trafik til Channel-microservice.
+
+Implementeret routing:
+"ReverseProxy": {
+  "Routes": {
+    "channel-route": {
+      "ClusterId": "channel-cluster",
+      "Match": { "Path": "/channels/{**catch-all}" }
+    }
+  },
+  "Clusters": {
+    "channel-cluster": {
+      "Destinations": {
+        "channel-api": {
+          "Address": "http://localhost:5171/"
+        }
+      }
+    }
+  }
+}
+
+
+Gatewayen lytter på:
+http://localhost:5099
+
+Channel-service lytter på:
+http://localhost:5171
+
+Authorization via API-Key
+
+Som en del af uge 12-kravet blev der implementeret API key-beskyttelse på Channel-microservice.
+
+Hvordan det virker:
+
+Endpoints i Channel-service kræver headeren:
+X-Api-Key: super-secret-key
+
+Manglende nøgle → 401 Unauthorized
+
+Forkert nøgle → 401 Unauthorized
+
+Korrekt nøgle → request accepteres
+
+Eksempel (PowerShell)
+Uden API-nøgle
+Invoke-RestMethod -Method Post `
+  -Uri http://localhost:5171/channels `
+  -ContentType application/json `
+  -Body (@{ name = "no-key" } | ConvertTo-Json)
+
+
+Resultat: 401 Unauthorized
+
+Med API-nøgle
+$body = @{ name = "with-key" } | ConvertTo-Json
+
+Invoke-RestMethod -Method Post `
+  -Uri http://localhost:5171/channels `
+  -ContentType application/json `
+  -Headers @{ "X-Api-Key" = "super-secret-key" } `
+  -Body $body
+
+
+Resultat: 201 Created + ny channel

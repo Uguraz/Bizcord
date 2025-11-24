@@ -1,13 +1,20 @@
 ﻿using ChannelMicroservice.Application.Channels;
 using ChannelMicroservice.Contracts.Channels;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
 namespace ChannelMicroservice.Presentation;
 
 public static class ChannelEndpoints
 {
-    public static IEndpointRouteBuilder MapChannelEndpoints(this IEndpointRouteBuilder app)
+    public static RouteGroupBuilder MapChannelEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/channels", async (CreateChannelRequest req, ChannelService svc, CancellationToken ct) =>
+        // Opret en route-gruppe for alle channel-endpoints
+        var group = app.MapGroup("/channels");
+
+        // POST /channels
+        group.MapPost("/", async (CreateChannelRequest req, ChannelService svc, CancellationToken ct) =>
             {
                 try
                 {
@@ -30,6 +37,7 @@ public static class ChannelEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status409Conflict);
 
-        return app;
+       
+        return group;
     }
 }

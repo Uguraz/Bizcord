@@ -198,89 +198,82 @@ Invoke-RestMethod -Method Post `
 
 Resultat: 201 Created + ny channel
 
-##  Reliability (W48)
+## Reliability (W48)
 
-Denne uge blev der arbejdet med reliability patterns for Channel-microservicen. Fokus var på at identificere svage punkter og implementere en konkret strategi til at øge robustheden i servicen.
+I denne uge blev der arbejdet med reliability patterns for Channel-microservicen.  
+Fokus var på at identificere svage punkter og implementere en konkret strategi til at øge robustheden i servicen.
 
-Potentielle Failure Points
+### Potentielle failure points
 
 Nedenfor er de primære steder, microservicen kan fejle — og hvordan problemer håndteres.
 
-1. HTTP-kald fra API Gateway → Channel Microservice
+1. **HTTP-kald fra ChannelMicroservice → HashiCorp Vault**
 
-Failure: Microservicen kan være nede, langsom eller midlertidigt utilgængelig.
-Konsekvens: Brugeren oplever at forespørgslen fejler eller loader for længe.
-Mitigation:
+   - **Failure:** Vault kan være nede, utilgængelig eller langsom (timeout, 5xx-fejl, DNS-problemer).
+   - **Konsekvens:** Microservicen kan ikke hente messaging connection string ved startup.
+   - **Mitigation:**
+     - Der er implementeret en Polly **retry policy**, som forsøger kaldet til Vault flere gange, hvis der opstår midlertidige fejl.
+     - Fejl logges med `ILogger<Program>`, og microservicen starter stadig op, selv hvis Vault ikke kunne nås efter alle forsøg.
 
-Vi har implementeret Retry policy, som automatisk forsøger requestet igen ved midlertidige fejl.
+2. **ChannelService → Repository (in-memory / senere database)**
 
-Brug af circuit breaker er planlagt (ikke implementeret endnu).
+   - **Failure:** Repository kan kaste exceptions (fx ved invalide input eller duplicate navn).
+   - **Konsekvens:** Oprettelse af kanal fejler.
+   - **Mitigation:**
+     - `ChannelEndpoints` håndterer exceptions og returnerer passende HTTP-statuskoder:
+       - `400 Bad Request` ved `ArgumentException`
+       - `409 Conflict` ved `InvalidOperationException`
+     - Dette forhindrer, at applikationen crasher, og giver klienten en tydelig fejlbesked.
 
-2. ChannelService → Repository (in-memory / senere database)
+3. **Event publishing (IMessageClient / senere RabbitMQ)**
 
-Failure: Repository kan fejle ved duplicate checks eller ved læsning af data.
-Konsekvens: 409 conflicts eller brud i flow.
-Mitigation:
+   - **Failure:** Messaging-system kan være nede eller utilgængeligt.
+   - **Konsekvens:** `channel.created`-events kan gå tabt.
+   - **Mitigation:**
+     - I denne version er `IMessageClient` en mock (`NoopMessageClient`), så der opstår ikke reelle integrationsfejl endnu.
+     - Når RabbitMQ integreres, er planen at tilføje:
+       - Retry på publish-kaldet
+       - Dead-letter queues
+       - Durable exchanges/queues
 
-Validationslogik og exception-håndtering sikrer, at applikationen ikke crasher.
+---
 
-Graciøs håndtering af både ArgumentException og InvalidOperationException.
+### Implementeret reliability policy – Retry på Vault-kald
 
-3. Event Publishing (RabbitMQ senere)
+Der er implementeret en **Polly retry-strategi** omkring kaldet til HashiCorp Vault ved startup.
 
-Failure: Messaging-system kan være nede eller utilgængeligt.
-Konsekvens: ChannelCreated-events tabes.
-Mitigation:
+Ved opstart oprettes en retry policy:
 
-Event publishing er pt. mock’et.
-
-Når RabbitMQ integreres tilføjes:
-
-Retry
-
-Dead-letter queue
-
-Durable exchange/queue opsætning
-
-Implementeret Reliability Policy
-Retry Policy for ChannelService
-
-Der er implementeret en Polly-retry strategi som beskytter mod midlertidige fejl i repository- eller event-publishing-laget.
-
-Retry forsøger operationen igen 3 gange med eksponentiel backoff.
-
-Eksempel fra Program.cs:
-
-var retryPolicy = Policy
+```csharp
+var vaultRetryPolicy = Policy
     .Handle<Exception>()
     .WaitAndRetryAsync(
         retryCount: 3,
-        sleepDurationProvider: attempt => TimeSpan.FromMilliseconds(200 * attempt),
-        onRetry: (ex, delay, attempt, ctx) =>
-        {
-            builder.Logger.LogWarning(
-                ex,
-                "Retrying operation (attempt {Attempt}) after {Delay}ms",
-                attempt,
-                delay.TotalMilliseconds);
-        });
-
-
-Policy’en bruges ved endpoint-kald:
-
-app.MapPost("/channels", async (CreateChannelRequest req, ChannelService svc, CancellationToken ct) =>
+        sleepDurationProvider: attempt => TimeSpan.FromMilliseconds(200 * attempt)
+    );
+Policy’en bruges til at kalde Vault:
+using (var scope = app.Services.CreateScope())
 {
-    return await retryPolicy.ExecuteAsync(async () =>
+    var vault = scope.ServiceProvider.GetRequiredService<VaultMessagingSettingsProvider>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    try
     {
-        var dto = await svc.CreateAsync(req, ct);
-        return Results.Created($"/channels/{dto.Id}", dto);
-    });
-});
+        var connectionString = await vaultRetryPolicy.ExecuteAsync(
+            () => vault.GetConnectionStringAsync()
+        );
 
-Resultat
+        logger.LogInformation("Loaded messaging connection string from Vault: {Conn}", connectionString);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to load messaging connection string from Vault, even after retries.");
+    }
+}
+Resultat:
 
-Microservicen er nu mere robust, især mod midlertidige repository-fejl.
+Microservicen er mere robust over for midlertidige fejl i Vault.
 
-Brugeren får færre fejlbeskeder og bedre stabilitet.
+Der forsøges automatisk igen op til 3 gange, med stigende ventetid.
 
-Logging gør det synligt, når retry mekanismen aktiveres.
+Hvis alle forsøg fejler, får vi structured logging, men microservicen kan stadig starte, så den ikke er hårdt afhængig af Vault for at køre.

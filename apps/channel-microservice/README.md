@@ -277,3 +277,87 @@ Microservicen er mere robust over for midlertidige fejl i Vault.
 Der forsøges automatisk igen op til 3 gange, med stigende ventetid.
 
 Hvis alle forsøg fejler, får vi structured logging, men microservicen kan stadig starte, så den ikke er hårdt afhængig af Vault for at køre.
+
+W15 – Saga Pattern (Channel Creation Workflow)
+
+I uge 15 blev der implementeret et Saga-pattern for Channel-microservicen.
+En Saga bruges til at koordinere distribuerede workflows, specielt når flere systemer eller trin skal lykkes — eller rulles tilbage ved fejl.
+
+Formål
+
+Når en ny kanal bliver oprettet, skal der køres et workflow som senere vil involvere flere services, fx:
+
+Audit logging
+
+Notifications
+
+Message syncing
+
+Database writes i andre systemer
+
+Indtil videre er Saga’en en mocked / simplified implementering, men den viser strukturen og flowet.
+
+ChannelCreationSaga
+
+Sagaen ligger i:
+
+apps/channel-microservice/src/Messaging/Sagas/ChannelCreationSaga.cs
+
+Hvad sker der?
+
+Når POST /channels kaldes:
+
+ChannelService.CreateAsync() opretter kanalen
+
+Sagaen starter via:
+
+await saga.HandleAsync(dto.Id, dto.Name, ct);
+
+
+Sagaen logger workflowet og simulerer flere steps
+
+Hvis et step fejler, bliver kompensation trigget (mocked)
+
+Integration i Endpoints
+
+Sagaen bliver kaldt direkte fra ChannelEndpoints:
+
+group.MapPost("/", async (
+        CreateChannelRequest req,
+        ChannelService svc,
+        ChannelCreationSaga saga,
+        CancellationToken ct) =>
+{
+    var dto = await svc.CreateAsync(req, ct);
+
+    await saga.HandleAsync(dto.Id, dto.Name, ct);
+
+    return Results.Created($"/channels/{dto.Id}", dto);
+});
+
+
+Dette sikrer, at hver gang en kanal bliver oprettet, kører Saga-workflowet.
+
+Fejlhåndtering & Compensating Actions
+
+Sagaen er bygget efter de klassiske Saga-principper:
+
+Try: kør trin for trin i workflowet
+
+Catch: log fejl
+
+Compensate: rulle tilbage (mocked)
+
+Continue: service crasher ikke ved fejl i andre systemer
+
+Det gør processen robust og klar til udvidelse i næste iteration.
+
+Resultat
+
+Microservicen understøtter nu:
+
+✔ Saga workflow ved channel creation
+✔ Klar struktur til distributed transactions
+✔ Kompensationsstrategi (mocked)
+✔ Ensartet flow der kan udvides til RabbitMQ, AuditService, NotificationService m.fl.
+✔ Fuldt integreret i API’et

@@ -9,6 +9,8 @@ using Microsoft.Extensions.Options;
 using System.Text.Encodings.Web;
 using System.Security.Claims;
 using Polly;
+using ChannelMicroservice.Messaging.Sagas;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<IChannelRepository, InMemoryChannelRepository>();
 builder.Services.AddSingleton<IMessageClient, NoopMessageClient>();
 builder.Services.AddScoped<ChannelService>();
+builder.Services.AddScoped<ChannelCreationSaga>();
 
 // Simpel HttpClient til Vault (reliability håndteres via Polly ved startup)
 builder.Services.AddHttpClient<VaultMessagingSettingsProvider>();
